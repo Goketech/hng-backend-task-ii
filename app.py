@@ -1,4 +1,6 @@
 import os
+import uuid
+
 from flask import Flask, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -22,6 +24,10 @@ jwt = JWTManager(app)
 def unauthorized_callback(error):
     return jsonify({'message': 'Missing JWT token'}), 401
 
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return jsonify({'message': 'Invalid JWT token'}), 401
+
 @app.route('/')
 def home():
     return 'Hiiiii'
@@ -31,9 +37,11 @@ def register_user():
     data = request.get_json()
     try:
         validated_data = Validate.validate_user(data)
+        if isinstance(validated_data, tuple):
+            return validated_data
         validated_data['password'] = generate_password_hash(validated_data['password'])
-        user = Validate(**validated_data)
-        user.save()
+        validated_data['userId'] = str(uuid.uuid4())
+        user = Validate.save_user(validated_data)
 
         access_token = create_access_token(identity=user.userId)
 
@@ -60,7 +68,7 @@ def register_user():
             "statusCode": 400
         }
         return jsonify(response), 400
-
+    
 @app.route('/auth/login', methods=['POST'])
 def login_user():
     data = request.get_json()
@@ -71,7 +79,7 @@ def login_user():
             "statusCode": 401
         }
          return jsonify(response), 401
-    user = Validate.query.filter_by(email=data['email']).first()
+    user = User.query.filter_by(email=data['email']).first()
     if not user or not check_password_hash(user.password, data['password']):
         response = {
             "status": "Bad request",
@@ -95,12 +103,6 @@ def login_user():
         }
     }
     return jsonify(response), 200
-
-@app.route('/protected', methods=['GET'])
-@jwt_required()
-def protected_endpoint():
-    current_user = jwt.get_current_user()
-    return jsonify({'message': f'Welcome back, {current_user.userId}'})
 
 @app.route('/api/users/<id>', methods=['GET'])
 @jwt_required()
@@ -277,7 +279,7 @@ def add_user_to_organisation(orgId):
     try:
         db.session.commit()
     except Exception as e:
-        db.session.rollback()
+        db.session.rollback()       
         response = {
             "status": "Bad request",
             "message": "Client error",

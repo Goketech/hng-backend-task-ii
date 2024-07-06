@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from uuid import uuid4
 
 db = SQLAlchemy()
 
@@ -12,14 +13,16 @@ class User(db.Model):
     firstName = db.Column(db.String(80), nullable=False)
     lastName = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(80), nullable=False)
-    phone = db.Column(db.String(80))
+    password = db.Column(db.String(255), nullable=False)
+    phone = db.Column(db.String(120))
+    organisations = db.relationship('Organisation', secondary=user_organisation, backref='users')
+
 
     def __repr__(self):
         return f'<User {self.firstName} {self.lastName}>'
 
 class Organisation(db.Model):
-    orgId = db.Column(db.String(80), unique=True, primary_key=True)
+    orgId = db.Column(db.String(80), unique=True, primary_key=True, default=lambda: str(uuid4()))
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.String(255))
 
