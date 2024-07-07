@@ -11,7 +11,7 @@ class AuthTestCase(unittest.TestCase):
 
     def setUp(self):
         app.config['TESTING'] = True
-        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
+        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('TEST_URI')
         self.app = app.test_client()
         
         # Push the application context
