@@ -22,9 +22,11 @@ class OrganisationTestCase(unittest.TestCase):
         db.create_all()
 
         self.user = User(userId='testuser', firstName='John', lastName='Doe', email='john.doe@example.com', password='password123', phone='1234567890')
+        self.another_user = User(userId='anotheruser', firstName='Jane', lastName='Doe', email='mark.hng@example.com', password='password123', phone='0987654321')
         db.session.add(self.user)
         self.organisation = Organisation(orgId='testorg', name='Test Organisation', description='A test organisation')
         self.organisation.users.append(self.user)
+        self.organisation.users.append(self.another_user)
         db.session.add(self.organisation)
         db.session.commit()
 
@@ -36,6 +38,41 @@ class OrganisationTestCase(unittest.TestCase):
         
         # Pop the application context
         self.app_context.pop()
+
+    def test_get_user_success(self):
+        response = self.app.get(f'/api/users/{self.another_user.userId}', headers={'Authorization': f'Bearer {self.access_token}'})
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['data']['userId'], self.another_user.userId)
+
+    def test_get_user_not_found(self):
+        response = self.app.get('/api/users/nonexistent', headers={'Authorization': f'Bearer {self.access_token}'})
+        data = response.get_json()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(data['message'], 'User not found')
+
+    def test_get_user_current_user_not_found(self):
+        # Remove current user from the database
+        db.session.delete(self.user)
+        db.session.commit()
+
+        response = self.app.get(f'/api/users/{self.another_user.userId}', headers={'Authorization': f'Bearer {self.access_token}'})
+        data = response.get_json()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(data['message'], 'Current user not found')
+
+    def test_get_user_no_permission(self):
+        new_user = User(userId='newuser', firstName='Jack', lastName='Smith', email='jack.smith@example.com', password='password123', phone='1231231234')
+        db.session.add(new_user)
+        db.session.commit()
+        
+        new_user_token = create_access_token(identity=new_user.userId)
+
+        response = self.app.get(f'/api/users/{self.user.userId}', headers={'Authorization': f'Bearer {new_user_token}'})
+        data = response.get_json()
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(data['message'], 'You do not have permission to view this user')
 
     def test_get_organisations(self):
         response = self.app.get('/api/organisations', headers={'Authorization': f'Bearer {self.access_token}'})

@@ -118,7 +118,8 @@ def get_user(id):
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
-    if user not in current_user.organisations and user != current_user:
+    shared_organisations = set(current_user.organisations).intersection(user.organisations)
+    if not shared_organisations and user != current_user:
         return jsonify({'message': 'You do not have permission to view this user'}), 403
 
     response = {
